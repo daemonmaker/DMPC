@@ -1,0 +1,60 @@
+!obj:pylearn2.train.Train {
+    dataset: &train !obj:pylearn2.datasets.path_solutions_dataset.PathSolutionsDataset {
+        pkl_path: &pkl_path "path_solutions.pkl",
+        which_set: 'train',
+    },
+    model: !obj:pylearn2.models.mlp.MLP {
+        batch_size : 64,
+        nvis: 657,
+        layers     : [
+             !obj:pylearn2.models.mlp.Tanh {
+                 dim        : 256,
+                 layer_name : 'h0',
+                 irange     : 0.002,
+             },
+             !obj:pylearn2.models.mlp.Tanh {
+                 dim        : 256,
+                 layer_name : 'h1',
+                 irange     : 0.004,
+             },
+             !obj:pylearn2.models.mlp.Linear {
+                 dim        : 12,
+                 layer_name : 'y',
+                 irange     : 0.002,
+             },
+        ],
+    },
+    algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
+        learning_rate      : .1e-3,
+        monitoring_batches : 100,
+        monitoring_dataset : {
+            'valid': !obj:pylearn2.datasets.path_solutions_dataset.PathSolutionsDataset {
+                pkl_path: *pkl_path,
+                which_set: 'validate',
+            },
+        },
+        cost: !obj:pylearn2.costs.mlp.dropout.Dropout {
+            input_include_probs : { 'h0' : .8 },
+            input_scales        : { 'h0' : 1. },
+        },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: 'valid_objective',
+            prop_decrease: 0.,
+            N: 10
+        },
+        learning_rule: !obj:pylearn2.training_algorithms.learning_rule.Momentum {
+            init_momentum: &init_momentum 0.77
+        },
+        train_iteration_mode: 'even_shuffled_sequential',
+        monitor_iteration_mode: 'even_sequential',
+    },
+    extensions: [
+        !obj:pylearn2.training_algorithms.learning_rule.MomentumAdjustor {
+            final_momentum: 1,
+            start: *init_momentum,
+            saturate: 100
+        }
+    ],
+    save_path: "deep_tanh_model.pkl",
+    save_freq: 10,
+}

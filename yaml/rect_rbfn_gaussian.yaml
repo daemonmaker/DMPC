@@ -1,0 +1,69 @@
+!obj:pylearn2.train.Train {
+    dataset: &train !obj:pylearn2.datasets.path_solutions_dataset.PathSolutionsDataset {
+        pkl_path: &pkl_path "path_solutions.pkl",
+        which_set: 'train',
+    },
+    model: !obj:pylearn2.models.mlp.MLP {
+        batch_size : 64,
+        nvis: 657,
+        layers     : [
+             !obj:pylearn2.models.mlp.RectifiedLinear {
+                 dim        : 1024,
+                 layer_name : 'h0',
+                 irange     : 0.002,
+             },
+             !obj:learning_sequences.pylearn2.models.rbfn.RadialBasisFunction {
+                 dim                : 16,
+                 layer_name         : 'rbfn',
+                 irange             : 0.001,
+                 standard_deviations: 10,
+             },
+             !obj:pylearn2.models.mlp.LinearGaussian {
+                 dim           : 12,
+                 layer_name    : 'y',
+                 irange        : 0.001,
+                 init_beta     : 1,
+                 min_beta      : 0.01,
+                 max_beta      : 10.,
+                 beta_lr_scale : 1.,
+             },
+        ],
+    },
+    algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
+        learning_rate      : .1e-4,
+        monitoring_batches : 100,
+        monitoring_dataset : {
+            'test' : !obj:pylearn2.datasets.path_solutions_dataset.PathSolutionsDataset {
+                pkl_path : *pkl_path,
+                which_set: 'test',
+            },
+            'valid': !obj:pylearn2.datasets.path_solutions_dataset.PathSolutionsDataset {
+                pkl_path : *pkl_path,
+                which_set: 'validate',
+            },
+        },
+        cost: !obj:pylearn2.costs.mlp.dropout.Dropout {
+            input_include_probs : { 'h0' : .8 },
+            input_scales        : { 'h0' : 1. },
+        },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: 'valid_objective',
+            prop_decrease: 0.,
+            N: 100
+        },
+        learning_rule: !obj:pylearn2.training_algorithms.learning_rule.Momentum {
+            init_momentum: &init_momentum 0.5
+        },
+        train_iteration_mode: 'even_shuffled_sequential',
+        monitor_iteration_mode: 'even_sequential',
+    },
+    extensions: [
+        !obj:pylearn2.training_algorithms.learning_rule.MomentumAdjustor {
+            final_momentum: 0.99,
+            start: *init_momentum,
+            saturate: 1000
+        }
+    ],
+    save_path: "rect_rbfn_gaussian_model.pkl",
+    save_freq: 50,
+}
